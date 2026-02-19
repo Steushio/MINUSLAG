@@ -27,7 +27,7 @@ Download the latest installer from the [Releases](../../releases) page.
 
 ## License
 
-Copyright (c) 2026 Steushio. All rights reserved.
+Copyright (c) 2026 Amit Raj. All rights reserved.
 
 This source code is provided for reference and educational purposes only.
 **Redistribution, modification, rebranding, or commercial use is strictly prohibited.**
