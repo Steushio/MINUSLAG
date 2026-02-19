@@ -2,7 +2,7 @@
 
 [![YouTube](https://img.shields.io/badge/YouTube-FF0000?style=for-the-badge&logo=youtube&logoColor=white)](https://www.youtube.com/channel/UCJiJVg2bCugG8g8V3aSt3SQ)
 [![Discord](https://img.shields.io/badge/Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/UBsenpp)
-[![Donate](https://img.shields.io/badge/Donate-FF5F5F?style=for-the-badge&logo=ko-fi&logoColor=white)](https://steushio.github.io/steushio-stream-support/)
+[![Donate](https://img.shields.io/badge/Donate-FF5F5F?style=for-the-badge&logo=ko-fi&logoColor=white)](https://steushio.github.io/steushio-stream-support/coffee.html)
 
 **Minus Lag** is a high-performance network optimization tool designed to stabilize ping, reduce jitter, and eliminate packet loss for competitive gaming.
 
@@ -56,7 +56,7 @@ Download the latest installer from the [Releases](../../releases) page.
 
 If **Minus Lag** has improved your gaming experience, consider supporting the project! Your contributions help keep the servers running and development active.
 
-<a href="https://steushio.github.io/steushio-stream-support/">
+<a href="https://steushio.github.io/steushio-stream-support/coffee.html">
   <img src="https://img.shields.io/badge/Buy%20Me%20A%20Coffee-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black" alt="Buy Me A Coffee" />
 </a>
 
