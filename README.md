@@ -2,7 +2,9 @@
 
 **Minus Lag** is a high-performance network optimization tool designed to stabilize ping, reduce jitter, and eliminate packet loss for competitive gaming.
 
-![Dashboard](screenshots/dashboard.png)
+<a href="screenshots/dashboard.png?raw=true" target="_blank">
+  <img src="screenshots/dashboard.png" width="600" alt="Dashboard" />
+</a>
 
 ## 🚀 Key Features
 
@@ -15,7 +17,9 @@ The command center for your network optimization.
 - **Global Benchmarks**: Compare your latency against major server regions (NA, EU, SEA).
 
 ### 2. Supported Games
-![Game Selection](screenshots/games.png)
+<a href="screenshots/games.png?raw=true" target="_blank">
+  <img src="screenshots/games.png" width="600" alt="Game Selection" />
+</a>
 Select from popular competitive titles including:
 - **Valorant** (with full Riot Client integration)
 - **League of Legends**
@@ -24,7 +28,9 @@ Select from popular competitive titles including:
 Each game profile includes recognized ports and executable paths for seamless optimization.
 
 ### 3. Advanced Settings
-![Settings](screenshots/settings.png)
+<a href="screenshots/settings.png?raw=true" target="_blank">
+  <img src="screenshots/settings.png" width="600" alt="Settings" />
+</a>
 Fine-tune your experience for maximum performance:
 - **UDP Multipath Duplication**:
     - **1× (Off)**: Standard connection.
