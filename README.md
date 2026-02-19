@@ -38,7 +38,7 @@ Fine-tune your experience for maximum performance:
     - **3× (Max)**: Extreme redundancy for highly unstable connections.
 - **NoDelay Registry Fix**: Applies Windows TCP optimizations (`TCPNoDelay`, `TcpAckFrequency`) to reduce buffering.
 - **No UAC Shortcut**: Creates a desktop shortcut that bypasses the Administrator prompt for faster startup.
-- **Hardware Acceleration**: Uses your GPU to render the UI for smoother animations.
+- **Hardware Acceleration**: Toggle GPU UI rendering (Saved preference, may require restart to fully apply).
 
 ## 📦 Installation
 

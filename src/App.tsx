@@ -107,11 +107,18 @@ function App() {
     return saved === 'true';
   });
 
+  const [hardwareAccel, setHardwareAccel] = useState(() => {
+    const saved = localStorage.getItem('hardwareAccel');
+    return saved !== 'false'; // Default to true
+  });
+
   // Save settings when changed
   useEffect(() => { localStorage.setItem('selectedGameId', selectedGame.id); }, [selectedGame]);
   useEffect(() => { localStorage.setItem('selectedRegionId', selectedRegion.id); }, [selectedRegion]);
   useEffect(() => { localStorage.setItem('multipathCount', multipathCount.toString()); }, [multipathCount]);
   useEffect(() => { localStorage.setItem('autoLaunch', autoLaunch.toString()); }, [autoLaunch]);
+  useEffect(() => { localStorage.setItem('hardwareAccel', hardwareAccel.toString()); }, [hardwareAccel]);
+  useEffect(() => { localStorage.setItem('hardwareAccel', hardwareAccel.toString()); }, [hardwareAccel]);
 
   // Sync configuration to backend (Reactive)
   useEffect(() => {
@@ -552,7 +559,10 @@ function App() {
                   <div style={{ fontWeight: 600 }}>Hardware Acceleration</div>
                   <div style={{ fontSize: '0.8rem', color: 'var(--text-dim)' }}>Use GPU for UI rendering</div>
                 </div>
-                <div className="toggle-switch active"></div>
+                <div
+                  className={`toggle-switch ${hardwareAccel ? 'active' : ''}`}
+                  onClick={() => setHardwareAccel(!hardwareAccel)}
+                ></div>
               </div>
               <div className="setting-item">
                 <div>
