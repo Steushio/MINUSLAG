@@ -1,6 +1,6 @@
 [package]
 name = "minus-lag"
-version = "0.1.0"
+version = "1.0.2"
 description = "A Tauri App"
 authors = ["you"]
 edition = "2021"
@@ -31,5 +31,6 @@ winreg = "0.52"
 windows-sys = { version = "0.52", features = ["Win32_NetworkManagement_IpHelper", "Win32_Networking_WinSock", "Win32_Foundation", "Win32_System_LibraryLoader", "Win32_System_Threading"] }
 tauri-plugin-positioner = { version = "2", features = ["tray-icon"] }
 tauri-plugin-autostart = "2"
+tauri-plugin-dialog = "2"
 futures = "0.3"
 

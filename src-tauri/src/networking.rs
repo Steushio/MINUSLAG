@@ -67,7 +67,7 @@ impl NetworkingState {
             active_game: Arc::new(RwLock::new(None)),
             detected_pids: Arc::new(RwLock::new(HashSet::new())),
             dynamic_ports: Arc::new(RwLock::new(HashSet::new())),
-            multipath_count: Arc::new(AtomicUsize::new(1)),
+            multipath_count: Arc::new(AtomicUsize::new(2)),
             packet_loss_pct: Arc::new(AtomicUsize::new(0)),
             jitter_ms: Arc::new(AtomicUsize::new(0)),
             game_server_ips: Arc::new(RwLock::new(Vec::new())),
@@ -135,8 +135,6 @@ impl NetworkingState {
                     let should_log = last == 0 || now - last > 60;
 
                     if should_log {
-                        log_debug(&format!("Scanning for executables: {:?}", game_execs));
-                        log_debug(&format!("Total processes visible: {}", sys.processes().len()));
                         for (pid, process) in sys.processes() {
                             let name = process.name().to_lowercase();
                             if name.contains("valorant") || name.contains("riot") || name.contains("cs2") {
@@ -158,7 +156,7 @@ impl NetworkingState {
                     }
                     
                     if !new_pids.is_empty() {
-                         log_debug(&format!("Detected Game PIDs: {:?}", new_pids));
+                         // Removed frequent PID log
                     }
 
                     // Windows IP Helper: scan ports of detected PIDs
@@ -244,7 +242,7 @@ impl NetworkingState {
                         *ports_lock = current_dynamic_ports;
                     }
                 }
-                thread::sleep(Duration::from_secs(2));
+                thread::sleep(Duration::from_secs(3));
             }
         });
 
@@ -295,11 +293,7 @@ impl NetworkingState {
                         }
                     };
                     
-                    if let Some(ip) = target_ip {
-                        log_debug(&format!("Pinging Target: {}", ip));
-                    } else {
-                        log_debug("No Target IP for Ping.");
-                    }
+                    // Target IP logging removed for resource optimization
 
                     let rtt: Option<u64> = if let Some(addr) = target_ip {
                         seq = seq.wrapping_add(1);
@@ -373,7 +367,7 @@ impl NetworkingState {
                     })
                 };
                 let _ = app_stats.emit("network-stats", stats);
-                thread::sleep(Duration::from_millis(500));
+                thread::sleep(Duration::from_secs(1));
             }
         });
 

@@ -50,38 +50,6 @@ async fn get_multiple_latencies(hosts: Vec<String>) -> Result<Vec<u64>, String> 
 }
 use surge_ping::{Client, Config, PingIdentifier, PingSequence};
 
-#[tauri::command]
-fn apply_no_delay_fix() -> Result<String, String> {
-    use winreg::enums::*;
-    use winreg::RegKey;
-
-    let hkcu = RegKey::predef(HKEY_LOCAL_MACHINE);
-    let path = r"SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\Interfaces";
-
-    let interfaces = hkcu
-        .open_subkey(path)
-        .map_err(|e| format!("Failed to open TCP interfaces key: {}", e))?;
-
-    let mut count = 0;
-    for name in interfaces.enum_keys().map(|x| x.unwrap()) {
-        if let Ok(iface_key) = interfaces.open_subkey_with_flags(&name, KEY_ALL_ACCESS) {
-            // Send ACK immediately (no delayed ACK batching)
-            let _: () = iface_key.set_value("TcpAckFrequency", &1u32).unwrap_or(());
-            // Disable Nagle's algorithm (no buffering small packets)
-            let _: () = iface_key.set_value("TCPNoDelay", &1u32).unwrap_or(());
-            count += 1;
-        }
-    }
-
-    if count > 0 {
-        Ok(format!(
-            "Successfully optimized {} network interfaces!",
-            count
-        ))
-    } else {
-        Err("No network interfaces found to optimize. Try running as Administrator.".into())
-    }
-}
 
 #[tauri::command]
 fn start_optimization<R: tauri::Runtime>(
@@ -226,6 +194,7 @@ pub fn run_lib<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<
         .manage(NetworkingState::new())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_positioner::init())
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, Some(vec!["--minimized"])))
         .invoke_handler(tauri::generate_handler![
             greet,
@@ -234,7 +203,6 @@ pub fn run_lib<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<
             get_server_latency,
             get_multiple_latencies,
             set_active_game,
-            apply_no_delay_fix,
             set_multipath_count,
             set_game_servers,
             create_uac_bypass,

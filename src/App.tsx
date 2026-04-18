@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { enable, disable, isEnabled } from "@tauri-apps/plugin-autostart";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import "./index.css";
 
 interface NetworkStats {
@@ -27,6 +29,55 @@ function App() {
     packet_loss_pct: 0, jitter_ms: 0, multipath_count: 2
   });
   const [packetHistory, setPacketHistory] = useState<number[]>([]);
+  const [customPaths, setCustomPaths] = useState<Record<string, string>>(() => {
+    const saved = localStorage.getItem('customGamePaths');
+    return saved ? JSON.parse(saved) : {};
+  });
+
+  const [manualModeGames, setManualModeGames] = useState<string[]>(() => {
+    const saved = localStorage.getItem('manualModeGames');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('customGamePaths', JSON.stringify(customPaths));
+  }, [customPaths]);
+
+  useEffect(() => {
+    localStorage.setItem('manualModeGames', JSON.stringify(manualModeGames));
+  }, [manualModeGames]);
+
+  const [showDonationPopup, setShowDonationPopup] = useState(false);
+  const DONATION_LINK = "https://steushio.github.io/steushio-stream-support/";
+
+  useEffect(() => {
+    const firstOpen = localStorage.getItem('firstOpenTimestamp');
+    const hasShown = localStorage.getItem('hasShownDonationPopup');
+
+    if (!firstOpen) {
+      localStorage.setItem('firstOpenTimestamp', Date.now().toString());
+    } else if (!hasShown) {
+      const firstOpenTime = parseInt(firstOpen, 10);
+      const now = Date.now();
+      const oneDayInMs = 24 * 60 * 60 * 1000;
+
+      // If at least 24 hours have passed since first open
+      if (now - firstOpenTime >= oneDayInMs) {
+        setShowDonationPopup(true);
+      }
+    }
+  }, []);
+
+  const handleDonate = () => {
+    localStorage.setItem('hasShownDonationPopup', 'true');
+    setShowDonationPopup(false);
+    openUrl(DONATION_LINK).catch(() => window.open(DONATION_LINK, '_blank'));
+  };
+
+  const closeDonationPopup = () => {
+    localStorage.setItem('hasShownDonationPopup', 'true');
+    setShowDonationPopup(false);
+  };
   // multipathCount state moved lower to group with persistence logic
 
   const GAMES = [
@@ -41,6 +92,8 @@ function App() {
       // Common Windows install paths for launcher logic
       executable_path: 'C:\\Riot Games\\Riot Client\\RiotClientServices.exe',
       launch_args: '--launch-product=valorant --launch-patchline=live',
+      manual_mode_type: 'folder',
+      launcher_rel_path: 'Riot Client\\RiotClientServices.exe',
       // Riot Games actual game server IP ranges (NA, EU, Asia)
       server_ips: ['206.127.144.1', '185.40.64.1', '162.249.73.1', '103.28.54.1'],
     },
@@ -52,6 +105,10 @@ function App() {
       udp_ports: [5000, 8088],
       udp_ranges: [[5000, 5500]],
       test_ip: '104.160.131.3',
+      executable_path: 'C:\\Riot Games\\Riot Client\\RiotClientServices.exe',
+      launch_args: '--launch-product=league_of_legends --launch-patchline=live',
+      manual_mode_type: 'folder',
+      launcher_rel_path: 'Riot Client\\RiotClientServices.exe',
       server_ips: ['104.160.131.3', '104.160.141.3', '104.160.144.1'],
     },
     {
@@ -62,6 +119,8 @@ function App() {
       udp_ports: [27015, 27020],
       udp_ranges: [[27000, 27100]],
       test_ip: '162.254.192.1',
+      executable_path: 'C:\\Program Files (x86)\\Steam\\steamapps\\common\\Counter-Strike Global Offensive\\game\\bin\\win64\\cs2.exe',
+      launch_args: '-high -novid',
       server_ips: ['162.254.192.1', '162.254.193.1', '162.254.196.1'],
     },
     {
@@ -72,6 +131,9 @@ function App() {
       udp_ports: [37005, 37015],
       udp_ranges: [[37000, 37020]],
       test_ip: '185.50.104.1',
+      executable_path: 'C:\\Program Files (x86)\\Steam\\steamapps\\common\\Apex Legends\\r5apex.exe',
+      launch_args: '-high -novid',
+      manual_mode_type: 'file',
       server_ips: ['185.50.104.1', '185.50.108.1', '45.33.0.1'],
     },
   ];
@@ -99,7 +161,7 @@ function App() {
 
   const [multipathCount, setMultipathCount] = useState(() => {
     const saved = localStorage.getItem('multipathCount');
-    return saved ? parseInt(saved, 10) : 1;
+    return saved ? parseInt(saved, 10) : 2;
   });
 
   const [autoLaunch, setAutoLaunch] = useState(() => {
@@ -201,7 +263,7 @@ function App() {
         }
       };
       fetchPings();
-      interval = setInterval(fetchPings, 3000);
+      interval = setInterval(fetchPings, 5000);
     } else {
       setPing(0);
       setRegionPings({ na: 0, eu: 0, asia: 0, mumbai: 0 });
@@ -232,8 +294,32 @@ function App() {
 
   const launchGame = async () => {
     try {
-      if (!selectedGame.executable_path) {
-        alert("Launch path not configured for this game yet!");
+      const isManual = manualModeGames.includes(selectedGame.id);
+      let currentPath = isManual 
+        ? customPaths[selectedGame.id] 
+        : selectedGame.executable_path;
+
+      // Handle folder-based launchers (like Valorant/Riot Client)
+      if (isManual && (selectedGame as any).manual_mode_type === 'folder' && currentPath) {
+        // If the user selected a directory, we append the relative launcher path
+        // We try both with and without the "Riot Client" subfolder in case they selected that directly
+        const relPath = (selectedGame as any).launcher_rel_path;
+        if (relPath) {
+          // Note: This is a bit of a heuristic but works for standard Riot installs
+          if (currentPath.endsWith('Riot Client') || currentPath.endsWith('Riot Client\\')) {
+             currentPath = currentPath.endsWith('\\') ? currentPath + 'RiotClientServices.exe' : currentPath + '\\RiotClientServices.exe';
+          } else {
+             currentPath = currentPath.endsWith('\\') ? currentPath + relPath : currentPath + '\\' + relPath;
+          }
+        }
+      }
+
+      if (!currentPath) {
+        if (isManual) {
+          alert("Please find the game executable manually first!");
+        } else {
+          alert("Default launch path not configured for this game yet!");
+        }
         return;
       }
 
@@ -243,7 +329,7 @@ function App() {
         : [];
 
       const res = await invoke("run_game_executable", {
-        path: selectedGame.executable_path,
+        path: currentPath,
         args
       });
       console.log(res);
@@ -251,6 +337,35 @@ function App() {
       console.error("Launch failed:", error);
       alert("Failed to launch game. Check path in settings.");
     }
+  };
+
+  const handleFindExecutable = async (gameId: string) => {
+    const game = GAMES.find(g => g.id === gameId);
+    try {
+      const isFolderMode = (game as any)?.manual_mode_type === 'folder';
+      
+      const selected = await openDialog({
+        multiple: false,
+        directory: isFolderMode,
+        filters: isFolderMode ? undefined : [{
+          name: 'Executable',
+          extensions: ['exe']
+        }]
+      });
+      if (selected && typeof selected === 'string') {
+        setCustomPaths(prev => ({ ...prev, [gameId]: selected }));
+      }
+    } catch (e) {
+      console.error("Failed to open dialog:", e);
+    }
+  };
+
+  const toggleManualMode = (gameId: string) => {
+    setManualModeGames(prev =>
+      prev.includes(gameId)
+        ? prev.filter(id => id !== gameId)
+        : [...prev, gameId]
+    );
   };
 
 
@@ -289,6 +404,12 @@ function App() {
           onClick={() => setCurrentView('settings')}
           title="Settings"
         >⚙️</div>
+        <div
+          className="sidebar-icon donate-btn"
+          onClick={() => openUrl(DONATION_LINK).catch(() => window.open(DONATION_LINK, '_blank'))}
+          title="Support the Developer ❤️"
+          style={{ marginTop: '1rem', color: '#f43f5e', background: 'rgba(244, 63, 94, 0.05)' }}
+        >💖</div>
         <div className="sidebar-footer">
           <div className="sidebar-icon">🔑</div>
         </div>
@@ -358,9 +479,8 @@ function App() {
                         {isGameDetected ? 'PID Detection: Active' : 'Port Detection: Active'}
                       </span>
                       <span className="tag-pill" style={{ background: 'rgba(16, 185, 129, 0.12)' }}>
-                        Multipath: {stats.multipath_count}x UDP
+                        Multipath: {stats.multipath_count === 3 ? 'Extreme' : 'Normal'}
                       </span>
-                      <span className="tag-pill">NoDelay Active</span>
                       <span className="tag-pill">Game Ports Only</span>
                     </>
                   )}
@@ -521,6 +641,32 @@ function App() {
                   <div className="game-card-icon" style={{ background: game.color }}>{game.icon}</div>
                   <div className="game-card-name">{game.name}</div>
                   <div className="game-card-ports">{game.ports.split(',')[0]}</div>
+                  
+                  <div className="manual-mode-container" onClick={(e) => e.stopPropagation()}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '0.5rem' }}>
+                      <span style={{ fontSize: '0.65rem', color: 'var(--text-dim)', fontWeight: 700 }}>{manualModeGames.includes(game.id) ? 'MANUAL' : 'DEFAULT'}</span>
+                      <div 
+                        className={`toggle-switch mini ${manualModeGames.includes(game.id) ? 'active' : ''}`}
+                        onClick={() => toggleManualMode(game.id)}
+                      ></div>
+                    </div>
+                    
+                    {manualModeGames.includes(game.id) && (
+                      <button
+                        className="btn-find-dir"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleFindExecutable(game.id);
+                        }}
+                        title={customPaths[game.id] || "No path set"}
+                        style={{ marginTop: 0, background: customPaths[game.id] ? 'rgba(16, 210, 255, 0.1)' : '' }}
+                      >
+                        {customPaths[game.id] 
+                          ? "📁 Folder Set" 
+                          : (game as any).manual_mode_type === 'folder' ? "📂 Find Riot Games Folder" : "📂 Find .exe"}
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -585,7 +731,7 @@ function App() {
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: '0.5rem', width: '100%' }}>
-                  {[1, 2, 3].map(n => (
+                  {[2, 3].map(n => (
                     <button
                       key={n}
                       onClick={() => handleMultipathChange(n)}
@@ -602,30 +748,12 @@ function App() {
                         transition: 'all 0.2s ease',
                       }}
                     >
-                      {n === 1 ? '1× Off' : n === 2 ? '2× Balanced' : '3× Max'}
+                      {n === 2 ? 'Normal' : 'Extreme'}
                     </button>
                   ))}
                 </div>
               </div>
 
-              <div className="setting-item">
-                <div>
-                  <div style={{ fontWeight: 600 }}>Windows "NoDelay" Registry Fix</div>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text-dim)' }}>Optimize TCP stack for gaming (Requires Admin)</div>
-                </div>
-                <button
-                  className="btn-secondary"
-                  style={{ fontSize: '0.7rem', padding: '0.4rem 0.8rem' }}
-                  onClick={async () => {
-                    try {
-                      const res = await invoke("apply_no_delay_fix");
-                      alert(res);
-                    } catch (e) {
-                      alert(e);
-                    }
-                  }}
-                >Apply Fix</button>
-              </div>
 
               <div className="setting-item">
                 <div>
@@ -652,6 +780,20 @@ function App() {
           </div>
         )}
       </main>
+
+      {showDonationPopup && (
+        <div className="modal-overlay">
+          <div className="modal-content donation-modal view-fade-in">
+            <div className="donation-icon">🎁</div>
+            <h2>Enjoying MINUS LAG?</h2>
+            <p>We hope the app is helping you reduce lag! If you find it useful, consider supporting the development with a small donation.</p>
+            <div className="modal-actions">
+              <button className="btn-secondary" onClick={closeDonationPopup}>Maybe Later</button>
+              <button className="btn-primary" onClick={handleDonate}>Support Now ❤️</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

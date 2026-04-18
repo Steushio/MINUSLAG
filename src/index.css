@@ -433,3 +433,98 @@ header {
 .toggle-switch.active::after {
   left: 24px;
 }
+
+.toggle-switch.mini {
+  width: 32px;
+  height: 18px;
+}
+
+.toggle-switch.mini::after {
+  width: 14px;
+  height: 14px;
+  left: 2px;
+  top: 2px;
+}
+
+.toggle-switch.mini.active::after {
+  left: 16px;
+}
+
+.manual-mode-container {
+  margin-top: 1rem;
+  padding-top: 0.8rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  width: 100%;
+}
+
+.btn-find-dir {
+  margin-top: 0.5rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--glass-border);
+  color: var(--text-dim);
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  width: 100%;
+}
+
+.btn-find-dir:hover {
+  background: var(--glass-border);
+  color: var(--text-main);
+  border-color: var(--primary-color);
+}
+
+.donate-btn:hover {
+  background: var(--accent-color) !important;
+  color: white !important;
+  box-shadow: 0 0 20px rgba(244, 63, 94, 0.4);
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: var(--surface-color);
+  border: 1px solid var(--glass-border);
+  border-radius: 24px;
+  padding: 2.5rem;
+  max-width: 400px;
+  text-align: center;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+}
+
+.donation-modal h2 {
+  margin: 1.5rem 0 1rem;
+  font-size: 1.5rem;
+}
+
+.donation-modal p {
+  color: var(--text-dim);
+  line-height: 1.6;
+  margin-bottom: 2rem;
+}
+
+.donation-icon {
+  font-size: 4rem;
+  filter: drop-shadow(0 0 15px var(--accent-color));
+}
+
+.modal-actions {
+  display: flex;
+  gap: 1rem;
+}
+
+.modal-actions button {
+  flex: 1;
+}

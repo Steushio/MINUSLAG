@@ -9,6 +9,7 @@
     "core:default",
     "opener:default",
     "positioner:default",
-    "autostart:default"
+    "autostart:default",
+    "dialog:default"
   ]
 }
