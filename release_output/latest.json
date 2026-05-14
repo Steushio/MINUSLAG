@@ -1,0 +1,11 @@
+{
+  "version": "1.0.3",
+  "notes": "MINUS LAG v1.0.3 - Performance improvements and bug fixes.",
+  "pub_date": "2026-05-14T07:45:40.895Z",
+  "platforms": {
+    "windows-x86_64": {
+      "signature": "Make sure to include this into the signature field of your update server.",
+      "url": "https://github.com/Steushio/MINUSLAG/releases/download/v1.0.3/MINUS%20LAG_1.0.3_x64_en-US.msi.zip"
+    }
+  }
+}

@@ -1,0 +1,44 @@
+﻿Starting signed build with key: C:\Users\Steushio\Documents\MINUS LAG\src-tauri\updater-key.key
+
+> minus-lag@1.0.3 tauri
+> tauri build
+
+node :         Info Looking up installed tauri packages to check mismatched versions...
+At line:1 char:24
++ ... RUST_BACKTRACE=1; node build_signed.cjs > build_error_full_2.txt 2>&1
++                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (        Info Lo...hed versions...:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+     Running beforeBuildCommand `npm run build`
+
+> minus-lag@1.0.3 build
+> tsc && vite build
+
+[36mvite v7.3.2 [32mbuilding client environment for production...[36m[39m
+transforming...
+[32mΓ£ô[39m 43 modules transformed.
+rendering chunks...
+computing gzip size...
+[2mdist/[22m[32mindex.html                        [39m[1m[2m  0.49 kB[22m[1m[22m[2m Γöé gzip:  0.31 kB[22m
+[2mdist/[22m[35massets/index-w8LCD0mj.css         [39m[1m[2m  7.84 kB[22m[1m[22m[2m Γöé gzip:  2.14 kB[22m
+[2mdist/[22m[36massets/webviewWindow-C0m6sdH3.js  [39m[1m[2m 17.50 kB[22m[1m[22m[2m Γöé gzip:  3.72 kB[22m
+[2mdist/[22m[36massets/index-Cpz5WCkn.js          [39m[1m[2m235.89 kB[22m[1m[22m[2m Γöé gzip: 72.50 kB[22m
+[32mΓ£ô built in 766ms[39m
+   Compiling minuslag v1.0.3 (C:\Users\Steushio\Documents\MINUS LAG\src-tauri)
+error: expected "camelCase" or "snake_case"
+   --> src\lib.rs:200:59
+    |
+200 | #[tauri::command(rename = "optimize-system", rename_all = "kebab-case")]
+    |                                                           ^^^^^^^^^^^^
+
+error: cannot find macro `__cmd__optimizesystem` in this scope
+   --> src\lib.rs:484:13
+    |
+484 |             optimizesystem,
+    |             ^^^^^^^^^^^^^^
+
+error: could not compile `minuslag` (lib) due to 2 previous errors
+failed to build app: failed to build app
+       Error failed to build app: failed to build app
+Build failed
