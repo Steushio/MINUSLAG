@@ -70,6 +70,8 @@ fn main() {
                 .on_menu_event(
                     move |app: &tauri::AppHandle, event| match event.id.as_ref() {
                         "quit" => {
+                            let state = app.state::<tauri_app_lib::networking::NetworkingState>();
+                            let _ = tauri_app_lib::spawn_detached_revert(&state);
                             app.exit(0);
                         }
                         _ => {}

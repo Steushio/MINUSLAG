@@ -1,4 +1,4 @@
-mod networking;
+pub mod networking;
 use networking::NetworkingState;
 use tauri::State;
 
@@ -189,12 +189,279 @@ $Shortcut.Save()
     Ok("UAC Bypass configured! Check your Desktop for the new shortcut.".into())
 }
 
+#[tauri::command]
+async fn optimize_system(services_to_stop: Vec<String>, state: State<'_, NetworkingState>) -> Result<String, String> {
+    if let Ok(mut stopped) = state.stopped_services.write() {
+        *stopped = services_to_stop.clone();
+    }
+
+    use std::process::Command;
+    use std::os::windows::process::CommandExt;
+    
+    // Set Timer Resolution to 0.5ms (5000 units of 100-ns)
+    unsafe {
+        let ntdll = windows_sys::Win32::System::LibraryLoader::GetModuleHandleA("ntdll.dll\0".as_ptr());
+        if ntdll != 0 {
+            let func_name = "NtSetTimerResolution\0";
+            let addr = windows_sys::Win32::System::LibraryLoader::GetProcAddress(ntdll, func_name.as_ptr());
+            if let Some(func) = addr {
+                let nt_set_timer_resolution: extern "system" fn(u32, i8, *mut u32) -> i32 = std::mem::transmute(func);
+                let mut current_res = 0;
+                nt_set_timer_resolution(5000, 1, &mut current_res);
+            }
+        }
+    }
+
+    let services_array = services_to_stop.iter().map(|s| format!("\"{}\"", s)).collect::<Vec<_>>().join(", ");
+    let ps_script = format!(r#"
+$ErrorActionPreference = 'SilentlyContinue'
+
+$stopped = 0
+$services = @({})
+if ($services.Count -gt 0) {{
+    $to_stop = Get-Service -Name $services -ErrorAction SilentlyContinue | Where-Object {{ $_.Status -eq 'Running' }}
+    if ($to_stop) {{
+        $to_stop | Set-Service -StartupType Manual
+        $to_stop | Stop-Service -Force
+        $stopped = $to_stop.Count
+    }}
+}}
+"#, services_array);
+
+    let ps_script_part2 = r#"
+$code = @"
+using System;
+using System.Runtime.InteropServices;
+
+public class Ram {
+    [DllImport("kernel32.dll", SetLastError = true)]
+    static extern bool SetSystemFileCacheSize(IntPtr MinimumFileCacheSize, IntPtr MaximumFileCacheSize, int Flags);
+
+    [DllImport("advapi32.dll", SetLastError = true)]
+    static extern bool OpenProcessToken(IntPtr ProcessHandle, uint DesiredAccess, out IntPtr TokenHandle);
+
+    [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+    static extern bool LookupPrivilegeValue(string lpSystemName, string lpName, out LUID lpLuid);
+
+    [DllImport("advapi32.dll", SetLastError = true)]
+    static extern bool AdjustTokenPrivileges(IntPtr TokenHandle, bool DisableAllPrivileges, ref TOKEN_PRIVILEGES NewState, uint BufferLength, IntPtr PreviousState, IntPtr ReturnLength);
+
+    [DllImport("ntdll.dll")]
+    static extern uint NtSetSystemInformation(int SystemInformationClass, IntPtr SystemInformation, int SystemInformationLength);
+
+    [StructLayout(LayoutKind.Sequential)]
+    struct LUID {
+        public uint LowPart;
+        public int HighPart;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    struct TOKEN_PRIVILEGES {
+        public uint PrivilegeCount;
+        public LUID Luid;
+        public uint Attributes;
+    }
+
+    public static void Clear() {
+        // 1. Flush System File Cache
+        try { SetSystemFileCacheSize(new IntPtr(-1), new IntPtr(-1), 0); } catch {}
+
+        // 2. Clear Standby List (requires SeProfileSingleProcessPrivilege)
+        try {
+            IntPtr tokenHandle;
+            if (OpenProcessToken(System.Diagnostics.Process.GetCurrentProcess().Handle, 0x0020 | 0x0008, out tokenHandle)) {
+                LUID luid;
+                if (LookupPrivilegeValue(null, "SeProfileSingleProcessPrivilege", out luid)) {
+                    TOKEN_PRIVILEGES tp = new TOKEN_PRIVILEGES();
+                    tp.PrivilegeCount = 1;
+                    tp.Luid = luid;
+                    tp.Attributes = 2; // SE_PRIVILEGE_ENABLED
+                    AdjustTokenPrivileges(tokenHandle, false, ref tp, 0, IntPtr.Zero, IntPtr.Zero);
+
+                    IntPtr ptr = Marshal.AllocHGlobal(4);
+                    // SystemMemoryListCommand: 4 = EmptyStandbyList
+                    Marshal.WriteInt32(ptr, 4);
+                    NtSetSystemInformation(80, ptr, 4);
+                    Marshal.FreeHGlobal(ptr);
+                }
+            }
+        } catch {}
+    }
+}
+"@
+Add-Type -TypeDefinition $code
+try {
+    $before = (Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory
+    [Ram]::Clear()
+    [System.GC]::Collect()
+    [System.GC]::WaitForPendingFinalizers()
+    $after = (Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory
+    $cleared_kb = $after - $before
+    if ($cleared_kb -lt 0) { $cleared_kb = 0 }
+    $ram_cleared = [Math]::Round($cleared_kb / 1024 / 1024, 2)
+} catch { $ram_cleared = 0 }
+
+$result = @{
+    services_optimized = $stopped
+    ram_cleared_gb = $ram_cleared
+    timer_resolution = 0.5
+}
+$result | ConvertTo-Json -Compress
+"#;
+    let ps_script = format!("{}\n{}", ps_script, ps_script_part2);
+
+    let output = tokio::task::spawn_blocking(move || {
+        Command::new("powershell")
+            .args(&["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", &ps_script])
+            .creation_flags(0x08000000) // CREATE_NO_WINDOW
+            .output()
+    }).await.map_err(|e| e.to_string())?.map_err(|e| e.to_string())?;
+
+    let out_str = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if out_str.is_empty() || !out_str.starts_with('{') {
+        Ok(r#"{"services_optimized":0,"processes_cleared":0,"timer_resolution":0.5}"#.to_string())
+    } else {
+        Ok(out_str)
+    }
+}
+
+#[tauri::command]
+async fn revert_system(state: State<'_, NetworkingState>) -> Result<String, String> {
+    revert_system_internal(state.inner()).await
+}
+
+pub async fn revert_system_internal(state: &NetworkingState) -> Result<String, String> {
+    use std::process::Command;
+    use std::os::windows::process::CommandExt;
+
+    let services_to_start = if let Ok(stopped) = state.stopped_services.read() {
+        stopped.clone()
+    } else {
+        Vec::new()
+    };
+
+    // Revert Timer Resolution
+    unsafe {
+        let ntdll = windows_sys::Win32::System::LibraryLoader::GetModuleHandleA("ntdll.dll\0".as_ptr());
+        if ntdll != 0 {
+            let func_name = "NtSetTimerResolution\0";
+            let addr = windows_sys::Win32::System::LibraryLoader::GetProcAddress(ntdll, func_name.as_ptr());
+            if let Some(func) = addr {
+                let nt_set_timer_resolution: extern "system" fn(u32, i8, *mut u32) -> i32 = std::mem::transmute(func);
+                let mut current_res = 0;
+                // SetResolution = 0 means revert to default
+                nt_set_timer_resolution(5000, 0, &mut current_res);
+            }
+        }
+    }
+
+    if services_to_start.is_empty() {
+        return Ok("No services to revert".to_string());
+    }
+
+    let services_array = services_to_start.iter().map(|s| format!("\"{}\"", s)).collect::<Vec<_>>().join(", ");
+    let ps_script = format!(r#"
+$ErrorActionPreference = 'SilentlyContinue'
+$services = @({})
+$reverted = 0
+if ($services.Count -gt 0) {{
+    $to_start = Get-Service -Name $services -ErrorAction SilentlyContinue | Where-Object {{ $_.Status -ne 'Running' }}
+    if ($to_start) {{
+        foreach ($svc in $to_start) {{
+            try {{
+                $svc | Set-Service -StartupType Automatic -ErrorAction SilentlyContinue
+                $svc | Start-Service -ErrorAction SilentlyContinue
+                $reverted++
+                Start-Sleep -Milliseconds 50
+            }} catch {{}}
+        }}
+    }}
+}}
+Write-Output $reverted
+"#, services_array);
+
+    let _output = tokio::task::spawn_blocking(move || {
+        Command::new("powershell")
+            .args(&["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", &ps_script])
+            .creation_flags(0x08000000)
+            .output()
+    }).await.map_err(|e| e.to_string())?.map_err(|e| e.to_string())?;
+
+    Ok("Reverted services".to_string())
+}
+
+pub fn spawn_detached_revert(state: &NetworkingState) -> Result<(), String> {
+    use std::process::Command;
+    use std::os::windows::process::CommandExt;
+
+    let services_to_start = if let Ok(stopped) = state.stopped_services.read() {
+        stopped.clone()
+    } else {
+        Vec::new()
+    };
+
+    // Revert Timer Resolution (sync is fine here, it's instant)
+    unsafe {
+        let ntdll = windows_sys::Win32::System::LibraryLoader::GetModuleHandleA("ntdll.dll\0".as_ptr());
+        if ntdll != 0 {
+            let func_name = "NtSetTimerResolution\0";
+            let addr = windows_sys::Win32::System::LibraryLoader::GetProcAddress(ntdll, func_name.as_ptr());
+            if let Some(func) = addr {
+                let nt_set_timer_resolution: extern "system" fn(u32, i8, *mut u32) -> i32 = std::mem::transmute(func);
+                let mut current_res = 0;
+                nt_set_timer_resolution(5000, 0, &mut current_res);
+            }
+        }
+    }
+
+    if services_to_start.is_empty() {
+        return Ok(());
+    }
+
+    let services_array = services_to_start.iter().map(|s| format!("\"{}\"", s)).collect::<Vec<_>>().join(", ");
+    let ps_script = format!(r#"
+$ErrorActionPreference = 'SilentlyContinue'
+$services = @({})
+if ($services.Count -gt 0) {{
+    $to_start = Get-Service -Name $services -ErrorAction SilentlyContinue | Where-Object {{ $_.Status -ne 'Running' }}
+    if ($to_start) {{
+        foreach ($svc in $to_start) {{
+            try {{
+                $svc | Set-Service -StartupType Automatic -ErrorAction SilentlyContinue
+                $svc | Start-Service -ErrorAction SilentlyContinue
+                Start-Sleep -Milliseconds 10
+            }} catch {{}}
+        }}
+    }}
+}}
+"#, services_array);
+
+    // Spawn as a completely detached process so it lives after we die
+    Command::new("powershell")
+        .args(&["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", &ps_script])
+        .creation_flags(0x08000000 | 0x00000008) // CREATE_NO_WINDOW | DETACHED_PROCESS
+        .spawn()
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
 pub fn run_lib<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
     builder
         .manage(NetworkingState::new())
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            use tauri::Manager;
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.unminimize();
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
+        }))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_positioner::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, Some(vec!["--minimized"])))
         .invoke_handler(tauri::generate_handler![
             greet,
@@ -206,6 +473,8 @@ pub fn run_lib<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<
             set_multipath_count,
             set_game_servers,
             create_uac_bypass,
+            optimize_system,
+            revert_system,
             networking::run_game_executable,
         ])
 }

@@ -55,6 +55,7 @@ pub struct NetworkingState {
     pub game_server_ips: Arc<RwLock<Vec<String>>>,
     /// The actual game server IP detected from live traffic
     pub detected_server_ip: Arc<RwLock<Option<String>>>,
+    pub stopped_services: Arc<RwLock<Vec<String>>>,
 }
 
 impl NetworkingState {
@@ -67,11 +68,12 @@ impl NetworkingState {
             active_game: Arc::new(RwLock::new(None)),
             detected_pids: Arc::new(RwLock::new(HashSet::new())),
             dynamic_ports: Arc::new(RwLock::new(HashSet::new())),
-            multipath_count: Arc::new(AtomicUsize::new(2)),
+            multipath_count: Arc::new(AtomicUsize::new(1)),
             packet_loss_pct: Arc::new(AtomicUsize::new(0)),
             jitter_ms: Arc::new(AtomicUsize::new(0)),
             game_server_ips: Arc::new(RwLock::new(Vec::new())),
             detected_server_ip: Arc::new(RwLock::new(None)),
+            stopped_services: Arc::new(RwLock::new(Vec::new())),
         }
     }
 
