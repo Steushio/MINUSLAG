@@ -41,6 +41,7 @@
   },
   "plugins": {
     "updater": {
+      "active": true,
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IERGMzQzQzU5RDUzOTA0MzIKUldReUJEblZXVHcwMzhpMDdqRTc2bU9keUQreHJsQmJaU21nVkMyQTA0aEJVUEFnaEtpOXJzem8K",
       "endpoints": [
         "https://github.com/Steushio/MINUSLAG/releases/latest/download/latest.json"
