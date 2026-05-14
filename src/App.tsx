@@ -9,7 +9,6 @@ import { relaunch } from '@tauri-apps/plugin-process';
 import "./index.css";
 
 interface OptimizationResult {
-  services_optimized: number;
   ram_cleared_gb: number;
   timer_resolution: number;
 }
@@ -22,11 +21,12 @@ interface NetworkStats {
   jitter_ms: number;
   multipath_count: number;
   detected_server_ip?: string | null;
+  current_ping: number;
 }
 
 function App() {
   const [ping, setPing] = useState(0);
-  const [regionPings, setRegionPings] = useState({ na: 0, eu: 0, asia: 0, mumbai: 0 });
+  const [regionPings, setRegionPings] = useState({ na: 0, eu: 0, singapore: 0, india: 0, japan: 0, brazil: 0 });
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [currentView, setCurrentView] = useState('dashboard');
   const [autoDetect, setAutoDetect] = useState(true);
@@ -38,7 +38,7 @@ function App() {
   });
   const [stats, setStats] = useState<NetworkStats>({
     tcp_packets: 0, udp_packets: 0, is_game_detected: false,
-    packet_loss_pct: 0, jitter_ms: 0, multipath_count: 1
+    packet_loss_pct: 0, jitter_ms: 0, multipath_count: 1, current_ping: 0
   });
   const [optResult, setOptResult] = useState<OptimizationResult | null>(null);
 
@@ -100,72 +100,95 @@ function App() {
       tcp_ports: [2099, 5222, 5223],
       udp_ports: [7000, 7100, 7200, 7300, 7400, 7500, 7600, 7700, 7800, 7900], 
       udp_ranges: [[7000, 8000]], 
-      test_ip: '206.127.144.1',
+      test_ip: '103.28.54.1',
       executable_path: 'C:\\Riot Games\\Riot Client\\RiotClientServices.exe',
       launch_args: '--launch-product=valorant --launch-patchline=live',
       manual_mode_type: 'folder',
       launcher_rel_path: 'Riot Client\\RiotClientServices.exe',
-      server_ips: ['206.127.144.1', '185.40.64.1', '162.249.73.1', '103.28.54.1'],
+      server_ips: ['103.28.54.1', '103.28.54.162'],
+      filter: ''
     },
     {
-      id: 'league', name: 'League of Legends', icon: 'L', color: '#005a82',
-      ports: '5000-5500, 8088',
-      executables: ['league of legends.exe', 'riotclientux.exe'],
-      tcp_ports: [2099, 5222, 5223, 80, 443],
-      udp_ports: [5000, 8088],
-      udp_ranges: [[5000, 5500]],
-      test_ip: '104.160.131.3',
-      executable_path: 'C:\\Riot Games\\Riot Client\\RiotClientServices.exe',
-      launch_args: '--launch-product=league_of_legends --launch-patchline=live',
+      id: 'fortnite', name: 'Fortnite', icon: 'F', color: '#fdea11',
+      ports: '9000-9100 (UDP)',
+      executables: ['fortniteclient-win64-shipping.exe', 'fortnitelauncher.exe', 'epicgameslauncher.exe'],
+      tcp_ports: [80, 443, 5222],
+      udp_ports: [9000, 9100],
+      udp_ranges: [[9000, 9100]],
+      test_ip: '1.1.1.1',
+      executable_path: 'C:\\Program Files\\Epic Games\\Fortnite\\FortniteGame\\Binaries\\Win64\\FortniteClient-Win64-Shipping.exe',
+      launch_args: '',
       manual_mode_type: 'folder',
-      launcher_rel_path: 'Riot Client\\RiotClientServices.exe',
-      server_ips: ['104.160.131.3', '104.160.141.3', '104.160.144.1'],
+      launcher_rel_path: 'Epic Games\\Launcher\\Portal\\Binaries\\Win32\\EpicGamesLauncher.exe',
+      server_ips: ['52.5.1.1'],
+      filter: ''
     },
     {
-      id: 'cs2', name: 'Counter-Strike 2', icon: 'C', color: '#de9b35',
-      ports: '27015-27030',
-      executables: ['cs2.exe'],
-      tcp_ports: [27015, 27036],
-      udp_ports: [27015, 27020],
+      id: 'cs2', name: 'CS2', icon: 'C', color: '#de9b35',
+      ports: '27000-27100 (UDP)',
+      executables: ['cs2.exe', 'steam.exe'],
+      tcp_ports: [27015, 27030],
+      udp_ports: [27000, 27100, 27015, 27020],
       udp_ranges: [[27000, 27100]],
-      test_ip: '162.254.192.1',
+      test_ip: '1.1.1.1',
       executable_path: 'C:\\Program Files (x86)\\Steam\\steamapps\\common\\Counter-Strike Global Offensive\\game\\bin\\win64\\cs2.exe',
-      launch_args: '-high -novid',
-      server_ips: ['162.254.192.1', '162.254.193.1', '162.254.196.1'],
+      launch_args: '-game csgo',
+      manual_mode_type: 'folder',
+      launcher_rel_path: 'Steam\\steam.exe',
+      server_ips: ['155.133.248.1'],
+      filter: ''
     },
     {
-      id: 'apex', name: 'Apex Legends', icon: 'A', color: '#ff4b24',
-      ports: '37005-37015',
-      executables: ['r5apex.exe'],
-      tcp_ports: [80, 443, 9946, 9947, 9988, 17502, 42127],
-      udp_ports: [37005, 37015],
-      udp_ranges: [[37000, 37020]],
-      test_ip: '185.50.104.1',
-      executable_path: 'C:\\Program Files (x86)\\Steam\\steamapps\\common\\Apex Legends\\r5apex.exe',
-      launch_args: '-high -novid',
+      id: 'warzone', name: 'Warzone', icon: 'W', color: '#2ecc71',
+      ports: '3000-3100 (UDP)',
+      executables: ['cod.exe', 'battlenet.exe'],
+      tcp_ports: [1119, 3724],
+      udp_ports: [3000, 3100, 3074],
+      udp_ranges: [[3000, 3100]],
+      test_ip: '8.8.8.8',
+      executable_path: 'C:\\Program Files (x86)\\Call of Duty\\_retail_\\cod.exe',
+      launch_args: '',
       manual_mode_type: 'file',
-      server_ips: ['185.50.104.1', '185.50.108.1', '45.33.0.1'],
+      server_ips: ['185.34.106.1'],
+      filter: ''
     },
     {
-      id: 'r6', name: 'Rainbow Six Siege', icon: '6', color: '#ffb300',
-      ports: '10000-10099',
-      executables: ['rainbowsix.exe', 'rainbowsix_vulkan.exe'],
+      id: 'apex', name: 'Apex', icon: 'A', color: '#e74c3c',
+      ports: '37000-38000 (UDP)',
+      executables: ['r5apex.exe', 'origin.exe', 'ea.exe'],
+      tcp_ports: [80, 443, 9988, 10000, 17502, 42127],
+      udp_ports: [37000, 38000],
+      udp_ranges: [[37000, 38000]],
+      test_ip: '8.8.8.8',
+      executable_path: 'C:\\Program Files\\EA Games\\Apex\\r5apex.exe',
+      launch_args: '',
+      manual_mode_type: 'file',
+      server_ips: ['1.1.1.1'],
+      filter: ''
+    },
+    {
+      id: 'r6s', name: 'R6 Siege', icon: 'R', color: '#3498db',
+      ports: '10000-11000 (UDP)',
+      executables: ['rainbowsix.exe', 'uplay.exe'],
       tcp_ports: [80, 443, 14000, 14008, 14020, 14021, 14022, 14023, 14024],
       udp_ports: [3074, 6015],
       udp_ranges: [[10000, 10099]],
-      test_ip: '216.58.200.142',
+      test_ip: '1.1.1.1',
       executable_path: "C:\\Program Files (x86)\\Ubisoft\\Ubisoft Game Launcher\\games\\Tom Clancy's Rainbow Six Siege\\RainbowSix.exe",
       launch_args: '',
       manual_mode_type: 'file',
       server_ips: [],
-    },
+      filter: ''
+    }
   ];
 
   const REGIONS = [
     { id: 'na', name: 'North America', ip: '8.8.8.8' },
-    { id: 'eu', name: 'Europe (Frankfurt)', ip: '7.7.7.7' },
-    { id: 'asia', name: 'Asia (Singapore)', ip: '1.1.1.1' },
-    { id: 'mumbai', name: 'India (Mumbai)', ip: '15.206.0.1' }
+    { id: 'eu', name: 'Europe', ip: '1.1.1.1' },
+    { id: 'singapore', name: 'Asia (Singapore)', ip: '103.28.54.1' },
+    { id: 'india', name: 'India (Mumbai)', ip: '103.28.54.162' },
+    { id: 'japan', name: 'Asia (Japan)', ip: '1.1.1.1' },
+    { id: 'brazil', name: 'South America', ip: '8.8.8.8' }
   ];
 
   const [selectedGame, setSelectedGame] = useState(() => {
@@ -224,8 +247,8 @@ function App() {
           tcp_ports: game.tcp_ports,
           udp_ports: game.udp_ports,
           udp_ranges: game.udp_ranges,
-          test_ip: game.test_ip,
-          server_ips: game.server_ips,
+          test_ip: selectedRegion.ip,
+          server_ips: [selectedRegion.ip],
         }
       });
     } catch (e) {
@@ -233,12 +256,60 @@ function App() {
     }
   };
 
+  const handleRegionChange = async (regionId: string) => {
+    const region = REGIONS.find(r => r.id === regionId);
+    if (region) {
+      setSelectedRegion(region);
+      try {
+        await invoke('set_active_game', {
+          config: {
+            id: selectedGame.id,
+            name: selectedGame.name,
+            executables: selectedGame.executables,
+            tcp_ports: selectedGame.tcp_ports,
+            udp_ports: selectedGame.udp_ports,
+            udp_ranges: selectedGame.udp_ranges,
+            test_ip: region.ip,
+            server_ips: [region.ip],
+          }
+        });
+      } catch (e) {
+        console.error("Failed to sync region config:", e);
+      }
+    }
+  };
+
   useEffect(() => {
+    const syncInitialConfig = async () => {
+      try {
+        await invoke('set_active_game', {
+          config: {
+            id: selectedGame.id,
+            name: selectedGame.name,
+            executables: selectedGame.executables,
+            tcp_ports: selectedGame.tcp_ports,
+            udp_ports: selectedGame.udp_ports,
+            udp_ranges: selectedGame.udp_ranges,
+            test_ip: selectedRegion.ip,
+            server_ips: [selectedRegion.ip],
+          }
+        });
+      } catch (e) {
+        console.error("Failed to sync initial config:", e);
+      }
+    };
+    syncInitialConfig();
+
     let unlisten: (() => void) | undefined;
     const setupListener = async () => {
       unlisten = await listen<NetworkStats>("network-stats", (event) => {
         setStats(event.payload);
         setIsGameDetected(event.payload.is_game_detected);
+        
+        // Update main ping from live route measurement if game is detected
+        if (event.payload.is_game_detected && event.payload.detected_server_ip) {
+           setPing(event.payload.current_ping);
+        }
       });
     };
     setupListener();
@@ -300,12 +371,19 @@ function App() {
         try {
           const hosts = [selectedRegion.ip, ...REGIONS.map(r => r.ip)];
           const latencies = await invoke<number[]>("get_multiple_latencies", { hosts });
-          setPing(latencies[0]);
+          
+          // Use detected game server IP for main ping if available, else use selected region
+          if (!stats.detected_server_ip) {
+            setPing(latencies[0]);
+          }
+          
           setRegionPings({
             na: latencies[1],
             eu: latencies[2],
-            asia: latencies[3],
-            mumbai: latencies[4]
+            singapore: latencies[3],
+            india: latencies[4],
+            japan: latencies[5],
+            brazil: latencies[6]
           });
         } catch (error) {
           console.error("Ping failed:", error);
@@ -315,159 +393,18 @@ function App() {
       interval = setInterval(fetchPings, 5000);
     } else {
       setPing(0);
-      setRegionPings({ na: 0, eu: 0, asia: 0, mumbai: 0 });
+      setRegionPings({ na: 0, eu: 0, singapore: 0, india: 0, japan: 0, brazil: 0 });
     }
     return () => clearInterval(interval);
   }, [isOptimizing, selectedRegion]);
 
-  const SERVICE_LIST = [
-    { id: "tzautoupdate", desc: "Time Zone Auto Update", category: "recommended" },
-    { id: "PeerDistSvc", desc: "BranchCache (Network Optimization)", category: "recommended" },
-    { id: "autotimesvc", desc: "Cellular Time Sync", category: "recommended" },
-    { id: "DusmSvc", desc: "Data Usage Monitoring", category: "recommended" },
-    { id: "DoSvc", desc: "Delivery Optimization (P2P Updates)", category: "recommended" },
-    { id: "diagsvc", desc: "Diagnostic Execution", category: "recommended" },
-    { id: "DPS", desc: "Diagnostic Policy Service", category: "recommended" },
-    { id: "WdiServiceHost", desc: "Diagnostic Service Host", category: "recommended" },
-    { id: "WdiSystemHost", desc: "Diagnostic System Host", category: "recommended" },
-    { id: "MapsBroker", desc: "Downloaded Maps Manager", category: "recommended" },
-    { id: "EntAppSvc", desc: "Enterprise App Management", category: "recommended" },
-    { id: "fhsvc", desc: "File History Service", category: "recommended" },
-    { id: "UsoSvc", desc: "Update Orchestrator (Windows Update)", category: "recommended" },
-    { id: "vds", desc: "Virtual Disk Service", category: "recommended" },
-    { id: "VSS", desc: "Volume Shadow Copy (Backups)", category: "recommended" },
-    { id: "WalletService", desc: "Microsoft Wallet Service", category: "recommended" },
-    { id: "webthreatdefusersvc", desc: "Web Threat Protection (User)", category: "recommended" },
-    { id: "webthreatdefsvc", desc: "Web Threat Protection Service", category: "recommended" },
-    { id: "TokenBroker", desc: "Windows Token Broker", category: "recommended" },
-    { id: "TimeBrokerSvc", desc: "Background Tasks Timing", category: "recommended" },
-    { id: "TapiSrv", desc: "Telephony (Phone/Dialup)", category: "recommended" },
-    { id: "SysMain", desc: "Superfetch (Disk Caching)", category: "recommended" },
-    { id: "OneSyncSvc", desc: "Account Syncing (Mail/Calendar)", category: "recommended" },
-    { id: "StorSvc", desc: "Storage Service", category: "recommended" },
-    { id: "WiaRpc", desc: "Still Image Acquisition (Scanners)", category: "recommended" },
-    { id: "SNMPTrap", desc: "SNMP Monitoring Service", category: "recommended" },
-    { id: "SCPolicySvc", desc: "Smart Card Policy", category: "recommended" },
-    { id: "ScDeviceEnum", desc: "Smart Card Device Enumeration", category: "recommended" },
-    { id: "SCardSvr", desc: "Smart Card Login", category: "recommended" },
-    { id: "shpamsvc", desc: "Shared PC Account Manager", category: "recommended" },
-    { id: "RemoteAccess", desc: "Routing and Remote Access", category: "recommended" },
-    { id: "TrkWks", desc: "Distributed Link Tracking", category: "recommended" },
-    { id: "MSDTC", desc: "Distributed Transaction Coord.", category: "recommended" },
-    { id: "HvHost", desc: "Hyper-V Host Service", category: "recommended" },
-    { id: "vmickvpexchange", desc: "Hyper-V Data Exchange", category: "recommended" },
-    { id: "vmicguestinterface", desc: "Hyper-V Guest Interface", category: "recommended" },
-    { id: "vmicshutdown", desc: "Hyper-V Guest Shutdown", category: "recommended" },
-    { id: "vmicheartbeat", desc: "Hyper-V Heartbeat", category: "recommended" },
-    { id: "vmicvmsession", desc: "Hyper-V VM Session", category: "recommended" },
-    { id: "vmicrdv", desc: "Hyper-V Remote Desktop", category: "recommended" },
-    { id: "vmictimesync", desc: "Hyper-V Time Sync", category: "recommended" },
-    { id: "vmicvss", desc: "Hyper-V Shadow Copy", category: "recommended" },
-    { id: "MessagingService", desc: "Windows Messaging", category: "recommended" },
-    { id: "wlidsvc", desc: "Microsoft Account Sign-in", category: "recommended" },
-    { id: "AppVClient", desc: "Microsoft App-V Client", category: "recommended" },
-    { id: "cloudidsvc", desc: "Microsoft Cloud Identity", category: "recommended" },
-    { id: "MicrosoftCopilotElevationService", desc: "Microsoft Copilot", category: "recommended" },
-    { id: "MicrosoftEdgeElevationService", desc: "Microsoft Edge Service", category: "recommended" },
-    { id: "edgeupdate", desc: "Microsoft Edge Update", category: "recommended" },
-    { id: "edgeupdatem", desc: "Microsoft Edge Update (Manual)", category: "recommended" },
-    { id: "swprv", desc: "Software Shadow Copy Provider", category: "recommended" },
-    { id: "CscService", desc: "Offline Files Service", category: "recommended" },
-    { id: "defragsvc", desc: "Disk Defragmenter", category: "recommended" },
-    { id: "P9RdrService", desc: "Plan 9 Redirector (WSL)", category: "recommended" },
-    { id: "WpcMonSvc", desc: "Parental Controls", category: "recommended" },
-    { id: "SEMgrSvc", desc: "Payments and NFC Manager", category: "recommended" },
-    { id: "wercplsupport", desc: "Problem Reports & Solutions", category: "recommended" },
-    { id: "PcaSvc", desc: "Compatibility Assistant", category: "recommended" },
-    { id: "RmSvc", desc: "Radio Management", category: "recommended" },
-    { id: "RasAuto", desc: "Remote Access Auto Connect", category: "recommended" },
-    { id: "RasMan", desc: "Remote Access Conn. Manager", category: "recommended" },
-    { id: "SessionEnv", desc: "Remote Desktop Config", category: "recommended" },
-    { id: "TermService", desc: "Remote Desktop Services", category: "recommended" },
-    { id: "UmRdpService", desc: "RDP Port Redirector", category: "recommended" },
-    { id: "RemoteRegistry", desc: "Remote Registry Service", category: "recommended" },
-    { id: "RetailDemo", desc: "Retail Demo Service", category: "recommended" },
-    { id: "WarpJITSvc", desc: "Warp JIT Service" , category: "recommended" },
-    { id: "SDRSVC", desc: "Windows Backup", category: "recommended" },
-    { id: "WbioSrvc", desc: "Windows Biometric (Fingerprint)", category: "recommended" },
-    { id: "wcncsvc", desc: "Windows Connect Now", category: "recommended" },
-    { id: "workfolderssvc", desc: "Work Folders", category: "recommended" },
-    { id: "wuauserv", desc: "Windows Update Service", category: "recommended" },
-    { id: "WerSvc", desc: "Windows Error Reporting", category: "recommended" },
-    { id: "wisvc", desc: "Windows Insider Service", category: "recommended" },
-    { id: "WMPNetworkSvc", desc: "WMP Network Sharing", category: "recommended" },
-    { id: "WSearch", desc: "Windows Search Indexing", category: "recommended" },
-    { id: "MixedRealityOpenXRSvc", desc: "Windows Mixed Reality", category: "recommended" },
-    { id: "WinRM", desc: "Windows Remote Management", category: "recommended" },
-    { id: "icssvc", desc: "Windows Mobile Hotspot", category: "recommended" },
-    { id: "Spooler", desc: "Print Spooler", category: "safe" },
-    { id: "PrintNotify", desc: "Printer Notifications", category: "safe" },
-    { id: "PrintWorkflowUserSvc", desc: "Print Workflow Service", category: "safe" },
-    { id: "XblAuthManager", desc: "Xbox Live Auth", category: "safe" },
-    { id: "XblGameSave", desc: "Xbox Live Game Save", category: "safe" },
-    { id: "XboxNetApiSvc", desc: "Xbox Live Networking", category: "safe" },
-    { id: "XboxGipSvc", desc: "Xbox Accessory Management", category: "safe" },
-    { id: "BcastDVRUserService", desc: "Game DVR (Recording)", category: "safe" },
-    { id: "SensorService", desc: "System Sensor Service", category: "safe" },
-    { id: "SensrSvc", desc: "Sensor Monitoring", category: "safe" },
-    { id: "SensorDataService", desc: "Sensor Data Collection", category: "safe" },
-    { id: "PenService", desc: "Pen and Touch Input", category: "safe" },
-    { id: "PhoneSvc", desc: "Phone Service (Link to Phone)", category: "safe" },
-    { id: "WPDBusEnum", desc: "Portable Device Enumerator", category: "safe" },
-    { id: "W32Time", desc: "Windows Time Sync", category: "safe" },
-    { id: "LanmanWorkstation", desc: "Network Share Client", category: "caution" },
-    { id: "Themes", desc: "Desktop Themes & Visuals", category: "caution" },
-    { id: "seclogon", desc: "Secondary Logon Service", category: "caution" },
-    { id: "FontCache", desc: "Windows Font Cache", category: "caution" },
-    { id: "Netlogon", desc: "Network Domain Login", category: "caution" },
-    { id: "BDESVC", desc: "BitLocker Drive Encryption", category: "caution" },
-  ];
-
-  const [enabledServices, setEnabledServices] = useState<string[]>(() => {
-    const saved = localStorage.getItem('enabledServices');
-    return saved ? JSON.parse(saved) : SERVICE_LIST.map(s => s.id);
-  });
-
-  const [showServiceSettings, setShowServiceSettings] = useState(false);
-
-  useEffect(() => {
-    localStorage.setItem('enabledServices', JSON.stringify(enabledServices));
-  }, [enabledServices]);
-
-  const toggleService = (serviceId: string) => {
-    setEnabledServices(prev => 
-      prev.includes(serviceId) ? prev.filter(s => s !== serviceId) : [...prev, serviceId]
-    );
-  };
-
-  const toggleCategory = (category: string, enable: boolean) => {
-    const categoryIds = SERVICE_LIST.filter(s => s.category === category).map(s => s.id);
-    setEnabledServices(prev => {
-      const filtered = prev.filter(id => !categoryIds.includes(id));
-      return enable ? [...filtered, ...categoryIds] : filtered;
-    });
-  };
-
-  const toggleAll = (enable: boolean) => {
-    setEnabledServices(enable ? SERVICE_LIST.map(s => s.id) : []);
-  };
-
   const runOptimization = async () => {
     try {
-      const res = await invoke<string>("optimize_system", { servicesToStop: enabledServices });
+      await invoke("apply_registry_optimizations");
+      const res = await invoke<string>("optimize_system", { servicesToStop: [] });
       setOptResult(JSON.parse(res));
     } catch (e) {
       console.error("Optimization failed:", e);
-    }
-  };
-
-  const revertOptimization = async () => {
-    try {
-      await invoke("revert_system");
-      setOptResult(null);
-      alert("Services reverted to normal!");
-    } catch (e) {
-      console.error("Revert failed:", e);
     }
   };
 
@@ -484,7 +421,7 @@ function App() {
       }
     } catch (error) {
       console.error("Failed to toggle optimization:", error);
-      alert("Error: Make sure you are running as Administrator!");
+      alert("Error: " + error);
     }
   };
 
@@ -508,7 +445,7 @@ function App() {
         return;
       }
       const args = selectedGame.launch_args ? selectedGame.launch_args.split(' ').filter(a => a.length > 0) : [];
-      await invoke("run_game_executable", { path: currentPath, args });
+      await invoke("run_game_executable", { path: currentPath, args, minimize: autoMinimize });
     } catch (error) {
       console.error("Launch failed:", error);
       alert("Failed to launch game. Check path in settings.");
@@ -544,57 +481,6 @@ function App() {
 
   return (
     <div className="app-container">
-      {showServiceSettings && (
-        <div className="modal-overlay" onClick={() => setShowServiceSettings(false)}>
-          <div className="modal-content card" onClick={e => e.stopPropagation()} style={{ maxWidth: '700px', maxHeight: '85vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', padding: '1.5rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.2rem' }}>
-              <div>
-                <h3 style={{ margin: 0 }}>Optimization Services</h3>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginTop: '0.2rem' }}>Configure which background tasks to suppress</div>
-              </div>
-              <button className="btn-secondary" style={{ width: 'auto', padding: '6px 16px' }} onClick={() => setShowServiceSettings(false)}>Close</button>
-            </div>
-            <div style={{ background: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', border: '1px solid var(--glass-border)' }}>
-               <div>
-                  <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>Master Toggle</div>
-                  <div style={{ fontSize: '0.7rem', color: 'var(--text-dim)' }}>Enable or disable all optimizations at once</div>
-               </div>
-               <div style={{ display: 'flex', gap: '0.8rem' }}>
-                  <button className="btn-secondary" style={{ width: 'auto', padding: '4px 12px', fontSize: '0.75rem' }} onClick={() => toggleAll(true)}>Enable All</button>
-                  <button className="btn-secondary" style={{ width: 'auto', padding: '4px 12px', fontSize: '0.75rem' }} onClick={() => toggleAll(false)}>Disable All</button>
-               </div>
-            </div>
-            <div style={{ overflowY: 'auto', flex: 1, paddingRight: '0.5rem' }}>
-              {[
-                { id: 'recommended', label: '🚀 Highly Recommended', color: '#10b981' },
-                { id: 'safe', label: "🎮 Safe if you don't use these features", color: '#3b82f6' },
-                { id: 'caution', label: '⚠️ Exercise Caution (Optional)', color: '#f59e0b' }
-              ].map(cat => (
-                <div key={cat.id} style={{ marginBottom: '1.5rem' }}>
-                  <div style={{ position: 'sticky', top: 0, zIndex: 10, background: 'var(--surface-color)', padding: '0.5rem 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: `2px solid ${cat.color}44`, marginBottom: '0.8rem' }}>
-                    <span style={{ fontWeight: 700, color: cat.color, fontSize: '0.9rem' }}>{cat.label}</span>
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
-                      <button className="btn-secondary" style={{ width: 'auto', padding: '2px 8px', fontSize: '0.65rem', borderRadius: '4px' }} onClick={() => toggleCategory(cat.id, true)}>All ON</button>
-                      <button className="btn-secondary" style={{ width: 'auto', padding: '2px 8px', fontSize: '0.65rem', borderRadius: '4px' }} onClick={() => toggleCategory(cat.id, false)}>All OFF</button>
-                    </div>
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.8rem' }}>
-                    {SERVICE_LIST.filter(s => s.category === cat.id).map(svc => (
-                      <div key={svc.id} className="setting-item" style={{ padding: '0.6rem 0.8rem', background: 'rgba(255,255,255,0.02)', borderRadius: '6px', borderBottom: 'none', flexDirection: 'column', alignItems: 'flex-start', gap: '0.4rem' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
-                          <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--primary-color)' }}>{svc.id}</span>
-                          <div className={`toggle-switch mini ${enabledServices.includes(svc.id) ? 'active' : ''}`} onClick={() => toggleService(svc.id)}></div>
-                        </div>
-                        <span style={{ fontSize: '0.65rem', color: 'var(--text-dim)', lineHeight: '1.2' }}>{svc.desc}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
 
       <aside className="sidebar">
         <div className={`sidebar-icon ${currentView === 'dashboard' ? 'active' : ''}`} onClick={() => setCurrentView('dashboard')} title="Dashboard">🏠</div>
@@ -663,11 +549,13 @@ function App() {
                 </div>
                 <div className="region-benchmark">
                   <div style={{ fontSize: '0.8rem', color: 'var(--text-dim)', marginBottom: '0.5rem' }}>Global Benchmarks</div>
-                  <div style={{ display: 'flex', gap: '0.8rem', background: 'rgba(255,255,255,0.03)', padding: '0.8rem', borderRadius: '8px' }}>
-                    <div style={{ flex: 1, textAlign: 'center' }}><div style={{ fontSize: '0.65rem', opacity: 0.6 }}>NA</div><div style={{ fontWeight: 600, color: '#10b981' }}>{regionPings.na || '--'}ms</div></div>
-                    <div style={{ flex: 1, textAlign: 'center', borderLeft: '1px solid rgba(255,255,255,0.1)', borderRight: '1px solid rgba(255,255,255,0.1)' }}><div style={{ fontSize: '0.65rem', opacity: 0.6 }}>EU</div><div style={{ fontWeight: 600, color: '#3b82f6' }}>{regionPings.eu || '--'}ms</div></div>
-                    <div style={{ flex: 1, textAlign: 'center', borderRight: '1px solid rgba(255,255,255,0.1)' }}><div style={{ fontSize: '0.65rem', opacity: 0.6 }}>SGP</div><div style={{ fontWeight: 600, color: '#f59e0b' }}>{regionPings.asia || '--'}ms</div></div>
-                    <div style={{ flex: 1, textAlign: 'center' }}><div style={{ fontSize: '0.65rem', opacity: 0.6 }}>BOM</div><div style={{ fontWeight: 600, color: '#a855f7' }}>{regionPings.mumbai || '--'}ms</div></div>
+                  <div style={{ display: 'flex', gap: '0.8rem', background: 'rgba(255,255,255,0.03)', padding: '0.8rem', borderRadius: '8px', overflowX: 'auto' }}>
+                    <div style={{ flex: 1, minWidth: '60px', textAlign: 'center' }}><div style={{ fontSize: '0.65rem', opacity: 0.6 }}>NA</div><div style={{ fontWeight: 600, color: '#10b981' }}>{regionPings.na || '--'}ms</div></div>
+                    <div style={{ flex: 1, minWidth: '60px', textAlign: 'center', borderLeft: '1px solid rgba(255,255,255,0.1)' }}><div style={{ fontSize: '0.65rem', opacity: 0.6 }}>EU</div><div style={{ fontWeight: 600, color: '#3b82f6' }}>{regionPings.eu || '--'}ms</div></div>
+                    <div style={{ flex: 1, minWidth: '60px', textAlign: 'center', borderLeft: '1px solid rgba(255,255,255,0.1)' }}><div style={{ fontSize: '0.65rem', opacity: 0.6 }}>SGP</div><div style={{ fontWeight: 600, color: '#f59e0b' }}>{regionPings.singapore || '--'}ms</div></div>
+                    <div style={{ flex: 1, minWidth: '60px', textAlign: 'center', borderLeft: '1px solid rgba(255,255,255,0.1)' }}><div style={{ fontSize: '0.65rem', opacity: 0.6 }}>IND</div><div style={{ fontWeight: 600, color: '#a855f7' }}>{regionPings.india || '--'}ms</div></div>
+                    <div style={{ flex: 1, minWidth: '60px', textAlign: 'center', borderLeft: '1px solid rgba(255,255,255,0.1)' }}><div style={{ fontSize: '0.65rem', opacity: 0.6 }}>JPN</div><div style={{ fontWeight: 600, color: '#ef4444' }}>{regionPings.japan || '--'}ms</div></div>
+                    <div style={{ flex: 1, minWidth: '60px', textAlign: 'center', borderLeft: '1px solid rgba(255,255,255,0.1)' }}><div style={{ fontSize: '0.65rem', opacity: 0.6 }}>BRZ</div><div style={{ fontWeight: 600, color: '#10b981' }}>{regionPings.brazil || '--'}ms</div></div>
                   </div>
                 </div>
               </section>
@@ -675,8 +563,8 @@ function App() {
               <section className="card active-optimization">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                   <h3 style={{ margin: 0 }}>Region: {selectedRegion.name}</h3>
-                  <select value={selectedRegion.id} onChange={(e) => { const region = REGIONS.find(r => r.id === e.target.value); if (region) setSelectedRegion(region); }} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--glass-border)', color: 'white', borderRadius: '4px', padding: '2px 8px', fontSize: '0.8rem', cursor: 'pointer' }}>
-                    {REGIONS.filter(r => r.id === 'asia' || r.id === 'mumbai').map(r => (<option key={r.id} value={r.id} style={{ background: '#1a1a2e' }}>{r.name.split(' (')[1].replace(')', '')}</option>))}
+                  <select value={selectedRegion.id} onChange={(e) => handleRegionChange(e.target.value)} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--glass-border)', color: 'white', borderRadius: '4px', padding: '2px 8px', fontSize: '0.8rem', cursor: 'pointer' }}>
+                    {REGIONS.map(r => (<option key={r.id} value={r.id} style={{ background: '#1a1a2e' }}>{r.name}</option>))}
                   </select>
                 </div>
                 <div className="game-list">
@@ -700,25 +588,19 @@ function App() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
                   <h3 style={{ margin: 0 }}>Game Booster</h3>
-                  <button className="sidebar-icon" style={{ background: 'rgba(255,255,255,0.05)', fontSize: '0.8rem', padding: '4px', borderRadius: '6px', width: '28px', height: '28px' }} onClick={() => setShowServiceSettings(true)} title="Service Settings">⚙️</button>
                 </div>
                 <span className="tag-pill" style={{ background: 'rgba(16, 210, 255, 0.1)', color: 'var(--primary-color)' }}>{autoOptimize ? 'Auto Mode Active' : 'Manual Mode'}</span>
               </div>
               <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
                 <div style={{ flex: 1, minWidth: '200px' }}>
                   <div className="setting-item" style={{ padding: '0.5rem 0', borderBottom: 'none' }}>
-                    <div><div style={{ fontWeight: 600 }}>Auto Optimize on Start</div><div style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>Apply tweaks when game starts</div></div>
+                    <div><div style={{ fontWeight: 600 }}>Optimize RAM</div><div style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>Apply tweaks when game starts</div></div>
                     <div className={`toggle-switch ${autoOptimize ? 'active' : ''}`} onClick={() => setAutoOptimize(!autoOptimize)}></div>
-                  </div>
-                  <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-                    <button className="btn-primary" style={{ flex: 4, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1rem', fontSize: '0.85rem' }} onClick={runOptimization}><span>⚡</span> Optimize Now</button>
-                    <button className="btn-secondary" style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '0.5rem', fontSize: '0.85rem' }} onClick={revertOptimization} title="Revert services to normal"><span>🔄</span></button>
                   </div>
                 </div>
                 <div style={{ flex: 1.5, minWidth: '250px', background: 'rgba(255,255,255,0.02)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--glass-border)' }}>
                   <div style={{ fontWeight: 600, fontSize: '0.85rem', marginBottom: '0.8rem', color: 'var(--primary-color)' }}>Optimization Details</div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.8rem' }}>
-                    <div><div style={{ fontSize: '0.65rem', color: 'var(--text-dim)' }}>Services Optimized</div><div style={{ fontWeight: 700, fontSize: '1.1rem' }}>{optResult ? optResult.services_optimized : '--'}</div></div>
                     <div><div style={{ fontSize: '0.65rem', color: 'var(--text-dim)' }}>RAM Cache Cleared</div><div style={{ fontWeight: 700, fontSize: '1.1rem' }}>{optResult ? `${optResult.ram_cleared_gb} GB` : '--'}</div></div>
                     <div><div style={{ fontSize: '0.65rem', color: 'var(--text-dim)' }}>Current Latency</div><div style={{ fontWeight: 700, fontSize: '1.1rem', color: '#10b981' }}>{optResult ? `${optResult.timer_resolution}ms` : '--'}</div></div>
                     <div><div style={{ fontSize: '0.65rem', color: 'var(--text-dim)' }}>Status</div><div style={{ fontWeight: 700, fontSize: '0.9rem', color: optResult ? '#10b981' : 'var(--text-dim)', paddingTop: '0.2rem' }}>{optResult ? 'Fully Optimized' : 'Pending'}</div></div>

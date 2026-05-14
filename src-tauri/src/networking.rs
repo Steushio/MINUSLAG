@@ -1,5 +1,6 @@
 use pnet_packet::ip::IpNextHeaderProtocols;
 use pnet_packet::udp::UdpPacket;
+use pnet_packet::ipv4::MutableIpv4Packet;
 use pnet_packet::Packet;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -23,6 +24,7 @@ fn log_debug(msg: &str) {
         let _ = writeln!(file, "[{:?}] {}", std::time::SystemTime::now(), msg);
     }
 }
+
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct GameConfig {
@@ -55,7 +57,8 @@ pub struct NetworkingState {
     pub game_server_ips: Arc<RwLock<Vec<String>>>,
     /// The actual game server IP detected from live traffic
     pub detected_server_ip: Arc<RwLock<Option<String>>>,
-    pub stopped_services: Arc<RwLock<Vec<String>>>,
+    /// Last measured RTT to the active game server
+    pub current_ping: Arc<AtomicUsize>,
 }
 
 impl NetworkingState {
@@ -73,7 +76,7 @@ impl NetworkingState {
             jitter_ms: Arc::new(AtomicUsize::new(0)),
             game_server_ips: Arc::new(RwLock::new(Vec::new())),
             detected_server_ip: Arc::new(RwLock::new(None)),
-            stopped_services: Arc::new(RwLock::new(Vec::new())),
+            current_ping: Arc::new(AtomicUsize::new(0)),
         }
     }
 
@@ -99,6 +102,7 @@ impl NetworkingState {
         udp_count.store(0, Ordering::SeqCst);
         packet_loss_pct.store(0, Ordering::SeqCst);
         jitter_ms.store(0, Ordering::SeqCst);
+        self.current_ping.store(0, Ordering::SeqCst);
         if let Ok(mut detected_ip) = self.detected_server_ip.write() {
             *detected_ip = None;
         }
@@ -244,7 +248,7 @@ impl NetworkingState {
                         *ports_lock = current_dynamic_ports;
                     }
                 }
-                thread::sleep(Duration::from_secs(3));
+                thread::sleep(Duration::from_secs(2));
             }
         });
 
@@ -255,8 +259,9 @@ impl NetworkingState {
         let is_running_rq = is_running.clone();
         let packet_loss_pct_rq = packet_loss_pct.clone();
         let jitter_ms_rq = jitter_ms.clone();
-        let game_server_ips_rq = game_server_ips.clone();
+        let game_server_ips = game_server_ips.clone();
         let detected_server_ip_rq = self.detected_server_ip.clone();
+        let current_ping_rq = self.current_ping.clone();
 
         thread::spawn(move || {
             // Create a single-threaded Tokio runtime for async pinging
@@ -290,7 +295,7 @@ impl NetworkingState {
                         if detected_addr.is_some() {
                             detected_addr
                         } else {
-                            let ips = game_server_ips_rq.read().ok();
+                            let ips = game_server_ips.read().ok();
                             ips.and_then(|list| list.iter().find_map(|s| s.parse::<IpAddr>().ok()))
                         }
                     };
@@ -316,6 +321,10 @@ impl NetworkingState {
                         samples.remove(0);
                     }
                     samples.push(rtt);
+                    
+                    if let Some(ms) = rtt {
+                        current_ping_rq.store(ms as usize, Ordering::Relaxed);
+                    }
 
                     if samples.len() >= 4 {
                         // Packet loss = fraction of None samples
@@ -347,6 +356,7 @@ impl NetworkingState {
         let jitter_ms_stats = jitter_ms.clone();
         let multipath_count_stats = multipath_count.clone();
         let detected_server_ip_stats = self.detected_server_ip.clone();
+        let current_ping_stats = self.current_ping.clone();
 
         thread::spawn(move || {
             while is_running_stats.load(Ordering::SeqCst) {
@@ -366,6 +376,7 @@ impl NetworkingState {
                         "jitter_ms": jitter_ms_stats.load(Ordering::Relaxed),
                         "multipath_count": multipath_count_stats.load(Ordering::Relaxed),
                         "detected_server_ip": detected_ip,
+                        "current_ping": current_ping_stats.load(Ordering::Relaxed),
                     })
                 };
                 let _ = app_stats.emit("network-stats", stats);
@@ -396,38 +407,34 @@ impl NetworkingState {
                 for port in &game.udp_ports {
                     port_clauses.push(format!("(udp and dst.Port == {})", port));
                 }
-                // TCP: Only intercept specific game ports (keep specific to avoid web overhead)
                 for port in &game.tcp_ports {
                     port_clauses.push(format!("(tcp and dst.Port == {})", port));
                 }
                 
-                // ALSO: Capture traffic from detected PIDs (Dynamic Source Ports) if any
-                // This requires a separate clause or we assume PIDs use matched destination ports?
-                // Actually, Windows Firewall / WinDivert filter usually targets DST ports for outbound.
-                // Dynamic PID capture is hard to filter in kernel without valid ports.
-                // So we rely on the specific ports. PID detection helps IDENTIFY packets in user-space.
-
                 if port_clauses.is_empty() {
-                    format!("outbound and (tcp or udp) and {}", vpn_exclusion)
+                    // Fallback to a safe but active filter if game has no ports defined
+                    format!("outbound and (udp or tcp) and {}", vpn_exclusion)
                 } else {
                     let ports_combined = port_clauses.join(" or ");
-                     format!("outbound and ({}) and {}", ports_combined, vpn_exclusion)
+                    // We widen the filter slightly to catch dynamic handshake ports
+                    format!("outbound and (udp or tcp) and ({}) and {}", ports_combined, vpn_exclusion)
                 }
             } else {
-                format!("outbound and (tcp or udp) and {}", vpn_exclusion)
+                // If no game is selected, capture a broad range of potential game ports
+                format!("outbound and (udp or tcp) and (dst.Port >= 1024 and dst.Port <= 65535) and {}", vpn_exclusion)
             }
         };
 
         let detected_server_ip_divert = self.detected_server_ip.clone();
         // ── Thread 4: WinDivert packet loop (high priority) ──────────────────
         thread::spawn(move || {
-            // Elevate this thread to highest priority — minimises processing jitter
+            // Elevate this thread to time critical priority — ensures lowest possible latency
             #[cfg(windows)]
             unsafe {
                 let handle = windows_sys::Win32::System::Threading::GetCurrentThread();
                 windows_sys::Win32::System::Threading::SetThreadPriority(
                     handle,
-                    windows_sys::Win32::System::Threading::THREAD_PRIORITY_HIGHEST,
+                    windows_sys::Win32::System::Threading::THREAD_PRIORITY_TIME_CRITICAL,
                 );
             }
 
@@ -442,60 +449,44 @@ impl NetworkingState {
                 };
 
             let mut buffer = [0u8; 65535];
+            
             while is_running.load(Ordering::SeqCst) {
                 match divert.recv(&mut buffer) {
-                    Ok(packet) => {
+                    Ok(mut packet) => {
                         let mut is_game_traffic = false;
                         let mut is_udp = false;
 
                         if let Some(ipv4) = pnet_packet::ipv4::Ipv4Packet::new(packet.data.as_ref()) {
                             match ipv4.get_next_level_protocol() {
                                 IpNextHeaderProtocols::Tcp => {
-                                    // TCP is already filtered by static rules (port specific), so it is game traffic.
-                                    // Use static filter for TCP to avoid analyzing web traffic overhead.
+                                    // TCP is already pre-filtered by our WinDivert handle to be game-only
+                                    is_game_traffic = true;
                                     tcp_count.fetch_add(1, Ordering::Relaxed);
-                                    if let Err(e) = divert.send(&packet) {
-                                        eprintln!("Failed to re-inject TCP packet: {}", e);
-                                    }
-                                    continue; // Done with TCP
                                 }
                                 IpNextHeaderProtocols::Udp => {
                                     is_udp = true;
-                                    // Check if this UDP packet is game traffic (Static or Dynamic)
                                     if let Some(udp) = UdpPacket::new(ipv4.payload()) {
-                                        let src_port = udp.get_source();
-                                        let dst_port = udp.get_destination();
-
-                                        // 1. Check Dynamic Ports (Match Source Port = Local Process)
-                                        if let Ok(ports) = dynamic_ports.read() {
-                                            if ports.contains(&src_port) {
-                                                is_game_traffic = true;
+                                        let src_port = udp.get_source(); let dst_port = udp.get_destination();
+                                        
+                                        // 1. Check static ports from config
+                                        let mut in_range = false;
+                                        if let Ok(g_opt) = active_game.read() {
+                                            if let Some(g) = g_opt.as_ref() {
+                                                in_range = g.udp_ports.contains(&dst_port) || 
+                                                           g.udp_ranges.iter().any(|(s, e)| dst_port >= *s && dst_port <= *e);
                                             }
                                         }
 
-                                        // 2. Fallback: Static Config
-                                        if !is_game_traffic {
-                                            if let Ok(g_opt) = active_game.read() {
-                                                if let Some(g) = g_opt.as_ref() {
-                                                     // Update: use proper port check including ranges
-                                                     let in_range = g.udp_ports.contains(&dst_port) || 
-                                                                    g.udp_ranges.iter().any(|(s, e)| dst_port >= *s && dst_port <= *e);
+                                        // 2. Check dynamic ports discovered from PIDs
+                                        let is_dynamic = if let Ok(ports) = dynamic_ports.read() {
+                                            ports.contains(&src_port)
+                                        } else {
+                                            false
+                                        };
 
-                                                     if in_range {
-                                                         is_game_traffic = true;
-                                                     }
-                                                }
-                                            }
-                                        }
-
-                                        if is_game_traffic {
-                                            // Update detected server IP
-                                            if let Ok(mut detected) = detected_server_ip_divert.write() {
-                                                let dst_ip = ipv4.get_destination().to_string();
-                                                if detected.as_ref() != Some(&dst_ip) {
-                                                    *detected = Some(dst_ip);
-                                                }
-                                            }
+                                        if in_range || is_dynamic {
+                                            is_game_traffic = true;
+                                            udp_count.fetch_add(1, Ordering::Relaxed);
                                         }
                                     }
                                 }
@@ -503,24 +494,49 @@ impl NetworkingState {
                             }
                         }
 
-                        if is_udp {
-                            if is_game_traffic {
-                                udp_count.fetch_add(1, Ordering::Relaxed);
-                                // ── UDP MULTIPATH DUPLICATION ──────────────────────
-                                let copies = multipath_count.load(Ordering::Relaxed).max(1);
-                                for _ in 0..copies {
-                                    if let Err(e) = divert.send(&packet) {
-                                        eprintln!("Failed to send UDP copy: {}", e);
-                                        break;
+                        if is_game_traffic {
+                            // MULTIPATH DUPLICATION & PRIORITIZATION
+                            let copies = multipath_count.load(Ordering::Relaxed).max(1);
+                            
+                            // Apply QoS Priority (Expedited Forwarding) to the original packet
+                            if let Some(mut ipv4_mut) = MutableIpv4Packet::new(packet.data.to_mut()) {
+                                ipv4_mut.set_dscp(46); // Expedited Forwarding (0x2E)
+                                ipv4_mut.set_ecn(0);
+                                let checksum = pnet_packet::ipv4::checksum(&ipv4_mut.to_immutable());
+                                ipv4_mut.set_checksum(checksum);
+                            }
+
+                            // Update detected server IP (Optimized: only check destination on game traffic)
+                            if let Some(ipv4_parse) = pnet_packet::ipv4::Ipv4Packet::new(packet.data.as_ref()) {
+                                let dst_ip = ipv4_parse.get_destination();
+                                if let Ok(mut detected) = detected_server_ip_divert.try_write() {
+                                    let ip_str = dst_ip.to_string();
+                                    if detected.as_ref() != Some(&ip_str) {
+                                        *detected = Some(ip_str);
                                     }
                                 }
-                            } else {
-                                // Passthrough for non-game UDP (Discord, etc.)
-                                let _ = divert.send(&packet);
                             }
-                        } else if !is_udp {
-                             // Non-IP or other protocol (shouldn't happen with our filter, but just in case)
-                             let _ = divert.send(&packet);
+
+                            // Send the original packet first
+                            let _ = divert.send(&packet);
+                            
+                            // Send duplicates if requested
+                            if copies > 1 && is_udp {
+                                for i in 1..copies {
+                                    let mut dup_packet = packet.clone();
+                                    if let Some(mut ipv4_mut) = MutableIpv4Packet::new(dup_packet.data.to_mut()) {
+                                        // Increment ID to avoid duplicate drop by some routers
+                                        let old_id = ipv4_mut.get_identification();
+                                        ipv4_mut.set_identification(old_id.wrapping_add(i as u16));
+                                        let checksum = pnet_packet::ipv4::checksum(&ipv4_mut.to_immutable());
+                                        ipv4_mut.set_checksum(checksum);
+                                    }
+                                    let _ = divert.send(&dup_packet);
+                                }
+                            }
+                        } else {
+                            // Normal passthrough for non-game traffic
+                            let _ = divert.send(&packet);
                         }
                     }
                     Err(e) => {
@@ -558,8 +574,14 @@ async fn ping_once_async(client: &Client, addr: IpAddr, id: u16, seq: u16) -> Op
 }
 
 #[tauri::command]
-pub fn run_game_executable(path: String, args: Vec<String>) -> Result<String, String> {
+pub fn run_game_executable<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
+    path: String, 
+    args: Vec<String>,
+    minimize: bool
+) -> Result<String, String> {
     use std::process::Command;
+    use tauri::Manager;
     log_debug(&format!("Launching game: {} with args: {:?}", path, args));
     
     let result = if cfg!(windows) {
@@ -575,6 +597,12 @@ pub fn run_game_executable(path: String, args: Vec<String>) -> Result<String, St
             .args(&args)
             .spawn()
     };
+
+    if minimize {
+        if let Some(window) = app.get_webview_window("main") {
+            let _ = window.hide();
+        }
+    }
 
     match result {
         Ok(_) => Ok(format!("Launched: {} with {} args", path, args.len())),

@@ -1,0 +1,18 @@
+[[permission]]
+identifier = "allow-all-app-commands"
+description = "Enables all app commands"
+commands.allow = [
+    "greet",
+    "start_optimization",
+    "stop_optimization",
+    "get_server_latency",
+    "get_multiple_latencies",
+    "set_active_game",
+    "set_multipath_count",
+    "set_game_servers",
+    "create_uac_bypass",
+    "optimize_system",
+    "revert_system",
+    "apply_registry_optimizations",
+    "run_game_executable"
+]
