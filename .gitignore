@@ -24,3 +24,10 @@ dist-ssr
 *.sw?
 *.key
 *.key.pub
+
+# Release outputs
+release_output/
+src-tauri/target/
+
+# Gemini
+.gemini*

@@ -29,7 +29,10 @@ function zipFile(inputPath, outputPath) {
 
 function signFile(filePath) {
   const cmd = `cmd /c npx tauri signer sign --private-key-path "${PRIVATE_KEY_PATH}" --password "${PRIVATE_KEY_PASSWORD}" "${filePath}"`;
-  return run(cmd);
+  run(cmd);
+  // Read the generated .sig file
+  const sigPath = filePath + '.sig';
+  return fs.readFileSync(sigPath, 'utf8').trim();
 }
 
 // ---- Main ----
@@ -48,8 +51,6 @@ console.log('\n🔏 Signing MSI zip...');
 let msiSig;
 try {
   msiSig = signFile(msiZipPath);
-  // Extract just the base64 sig (last line of output)
-  msiSig = msiSig.split('\n').pop().trim();
   console.log(`   ✅ Signed.`);
 } catch (e) {
   console.error('   ❌ Signing failed:', e.message);
@@ -66,7 +67,6 @@ console.log('\n🔏 Signing NSIS zip...');
 let nsisSig;
 try {
   nsisSig = signFile(nsisZipPath);
-  nsisSig = nsisSig.split('\n').pop().trim();
   console.log(`   ✅ Signed.`);
 } catch (e) {
   console.error('   ❌ Signing failed:', e.message);
