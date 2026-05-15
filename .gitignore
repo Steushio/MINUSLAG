@@ -36,4 +36,8 @@ src-tauri/target/
 build_*.txt
 WinDivert.zip
 windivert_lib/
+
+# Local scripts with secrets
+sign_build.bat
+
 tracked_files.txt
