@@ -31,3 +31,9 @@ src-tauri/target/
 
 # Gemini
 .gemini*
+
+# Build logs & artifacts
+build_*.txt
+WinDivert.zip
+windivert_lib/
+tracked_files.txt
